@@ -1,0 +1,11 @@
+# Rust
+/target
+**/*.rs.bk
+/Cargo.lock
+
+# VS Code
+/.code/
+
+# IntelliJ
+*.iml
+/.idea/

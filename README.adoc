@@ -1,0 +1,35 @@
+= Asami
+Mariell Hoversholm <proximyst@proximyst.com>
+v1.0
+:homepage: https://github.com/Proximyst/Asami
+
+Asami is a Discord bot without any current goals written in
+https://rust-lang.org[Rust]. In its current state, it works fine, but has no
+proper use.
+
+Please don't look at the source, it's all a big shitfest.
+
+== Usage
+
+. Get https://rustup.rs[Rust using Rustup].
+. Compile using `cargo build --release`, potentially for some other target
+triple than the compiling system.
+. Install https://mongodb.com[MongoDB] using your package manager or installer
+of choice. This is required to be running and properly configured *without* TLS
+and authentication.
+. Run the bot once and fix the `config.toml` file with correct information.
+. Get a bot token from <https://discordapp.com/developers>.
+. Run the bot as one usually would and start using it. The owner of the bot will
+be automatically fetched upon every start.
+
+== Dependency Graph
+
+A Rust program without a dependency graph would be incomplete.
+The graph was generated using `cargo deps --all-deps | dot -Tpng >| graph.png`.
+
+image::graph.png[Dependency graph]
+
+== Licence
+
+The project is licensed under the link:LICENCE[BSD 3-Clause Licence], and is as
+such free software.
