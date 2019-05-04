@@ -19,7 +19,7 @@ mod commands;
 mod config;
 mod data;
 mod error;
-mod ketosstringwriter;
+mod ketoswritewrapper;
 mod serenityhandler;
 
 pub mod consts;

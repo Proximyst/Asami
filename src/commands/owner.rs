@@ -67,7 +67,7 @@ fn evaluate(ctx: &mut Context, msg: &Message) -> CommandResult {
     }
     debug!("Entire code to run with ketos:\n{}", code_block);
 
-    let output_writer = Rc::new(crate::ketosstringwriter::KetosWriteWrapper::bytearray());
+    let output_writer = Rc::new(crate::ketoswritewrapper::KetosWriteWrapper::bytearray());
     let interpreter = ketos::Builder::new()
         .io(Rc::new(ketos::GlobalIo::new(
             Rc::clone(&output_writer) as Rc<dyn ketos::SharedWrite>,
