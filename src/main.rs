@@ -117,7 +117,6 @@ fn main() -> Result<()> {
                 c.with_whitespace(true)
                     .case_insensitivity(true)
                     .no_dm_prefix(true)
-                    .on_mention(true)
                     .owners(owners)
                     .prefix("a!")
                     .delimiters(vec![" "])

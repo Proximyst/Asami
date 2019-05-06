@@ -8,7 +8,10 @@ pub(crate) mod prelude {
         },
         model::prelude::*,
         prelude::*,
+        client::bridge::gateway::ShardManager,
     };
+    pub use parking_lot::Mutex;
+    pub use std::sync::Arc;
 }
 
 pub mod help;
