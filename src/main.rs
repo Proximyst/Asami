@@ -68,9 +68,8 @@ fn main() -> Result<()> {
         )
         .failure()?])?;
     }
-
     info!("The logger has been initalised.");
-    let token = config.token();
+
     info!("Creating connection with MongoDB...");
     let mongo = MongodbConnectionManager::new(
         MongoConnOpts::builder()
@@ -81,7 +80,7 @@ fn main() -> Result<()> {
     let mongo = Pool::new(mongo)?;
     info!("Mongo connection pool created!");
 
-    let mut discord_client: Client = Client::new(&token, self::serenityhandler::SerenityHandler)?;
+    let mut discord_client: Client = Client::new(&config.token(), self::serenityhandler::SerenityHandler)?;
 
     let owners = {
         let mut set = HashSet::new();
@@ -135,6 +134,7 @@ fn main() -> Result<()> {
                 }
 
                 // TODO: Support server-specific permission levels
+                // TODO: Support user blacklisting set by server admins
                 let settings = match UserSettings::new(msg.author.id.0, &ctx.data) {
                     Err(e) => {
                         error!("Couldn't get user data: {:?}", e);
@@ -166,6 +166,7 @@ fn main() -> Result<()> {
             })
             .after(|ctx, msg, _, err| {
                 if let Err(e) = err {
+                    // TODO: Log for bot owners
                     let _ = msg.reply(
                         &ctx,
                         &format!("The command erred with the following error: {}", e.0),
