@@ -112,6 +112,24 @@ impl UserSettings {
         self.modified = true;
         self.blacklisted = new;
     }
+
+    pub fn delete(mut self) -> Result<()> {
+        self.modified = false;
+
+        let read = self.serenity_data.read();
+        let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
+        let mongo = mongo.get()?;
+        let collection: mongodb::coll::Collection =
+            mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
+        collection.delete_one(
+            doc! {
+                "user_id": self.user_id,
+            },
+            None,
+        )?;
+
+        Ok(())
+    }
 }
 
 impl Drop for UserSettings {
