@@ -51,10 +51,10 @@ impl EventHandler for SerenityHandler {
                 Err(_) => {
                     error!("Couldn't unwrap server {}'s arc", guild.0);
                     return;
-                },
+                }
             };
             match s.into_inner().delete().err() {
-                None => {},
+                None => {}
                 Some(e) => error!("Couldn't delete {}: {}", guild.0, e),
             }
         }

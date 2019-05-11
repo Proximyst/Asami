@@ -7,8 +7,8 @@ use self::{
     commands::{DEVELOPER_GROUP, MISCELLANEOUS_GROUP},
     config::Configuration,
     data::{
-        OwnerContainer, ServerSettings, ServerSettingsContainer,
-        ShardManagerContainer, UserSettings, UserSettingsContainer, PostgreSqlContainer,
+        OwnerContainer, PostgreSqlContainer, ServerSettings, ServerSettingsContainer,
+        ShardManagerContainer, UserSettings, UserSettingsContainer,
     },
     prelude::*,
 };
@@ -27,11 +27,11 @@ pub mod consts;
 pub mod scheme;
 
 pub mod prelude {
-    pub use super::data::{ShardManagerContainer, PostgreSqlContainer};
+    pub use super::data::{PostgreSqlContainer, ShardManagerContainer};
     pub use super::error::*;
+    pub use diesel::{pg::PgConnection, r2d2::ConnectionManager as DieselConnectionManager};
     pub use log::{debug, error, info, trace, warn};
     pub use r2d2::{Pool, PooledConnection};
-    pub use diesel::{r2d2::ConnectionManager as DieselConnectionManager, pg::PgConnection};
 
     pub type PgPool = Pool<DieselConnectionManager<PgConnection>>;
 }
@@ -78,7 +78,8 @@ fn main() -> Result<()> {
     info!("PgSql connection pool created!");
 
     // Create the Discord client.
-    let mut discord_client: Client = Client::new(&config.token(), self::serenityhandler::SerenityHandler)?;
+    let mut discord_client: Client =
+        Client::new(&config.token(), self::serenityhandler::SerenityHandler)?;
 
     // Load the owners from the application on Discord's developers page
     let owners = {
@@ -126,9 +127,9 @@ fn main() -> Result<()> {
                     // Always allow owners of the bot to use it
                     let data = ctx.data.read();
                     if data
-                            .get::<OwnerContainer>()
-                            .map(|s| s.contains(&msg.author.id))
-                            .unwrap_or(false)
+                        .get::<OwnerContainer>()
+                        .map(|s| s.contains(&msg.author.id))
+                        .unwrap_or(false)
                     {
                         return true;
                     }
@@ -176,7 +177,7 @@ fn main() -> Result<()> {
             })
             .help(&self::commands::help::HELP_MENU_HELP_COMMAND)
             .group(&MISCELLANEOUS_GROUP)
-            .group(&DEVELOPER_GROUP)
+            .group(&DEVELOPER_GROUP),
     );
 
     // Start and shard the bot as needed to work with discord

@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use serenity::model::id::UserId;
+use std::collections::HashSet;
 use typemap::Key as TypeMapKey;
 
 pub struct OwnerContainer;

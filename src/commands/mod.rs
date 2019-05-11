@@ -1,16 +1,16 @@
 pub(crate) mod prelude {
     pub use super::super::prelude::*;
     pub use crate::data::{ServerSettings, UserSettings};
+    pub use parking_lot::Mutex;
     pub use serenity::{
+        client::bridge::gateway::ShardManager,
         framework::standard::{
             macros::{check, command, group, help},
             Args, CommandError, CommandResult,
         },
         model::prelude::*,
         prelude::*,
-        client::bridge::gateway::ShardManager,
     };
-    pub use parking_lot::Mutex;
     pub use std::sync::Arc;
 }
 

@@ -1,5 +1,5 @@
+use diesel::{pg::PgConnection, r2d2::ConnectionManager};
 use r2d2::Pool;
-use diesel::{r2d2::ConnectionManager, pg::PgConnection};
 use typemap::Key as TypeMapKey;
 
 pub struct PostgreSqlContainer;
