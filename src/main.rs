@@ -1,17 +1,18 @@
 #![feature(try_blocks)]
 
+#[macro_use]
+extern crate diesel;
+
 use self::{
     commands::{DEVELOPER_GROUP, MISCELLANEOUS_GROUP},
     config::Configuration,
     data::{
-        MongoContainer, OwnerContainer, ServerSettings, ServerSettingsContainer,
-        ShardManagerContainer, UserSettings, UserSettingsContainer,
+        OwnerContainer, ServerSettings, ServerSettingsContainer,
+        ShardManagerContainer, UserSettings, UserSettingsContainer, PostgreSqlContainer,
     },
     prelude::*,
 };
 use lru_time_cache::LruCache;
-use r2d2::Pool;
-use r2d2_mongodb::{ConnectionOptions as MongoConnOpts, MongodbConnectionManager};
 use serenity::{framework::StandardFramework, prelude::*};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
@@ -23,19 +24,16 @@ mod ketoswritewrapper;
 mod serenityhandler;
 
 pub mod consts;
+pub mod scheme;
 
 pub mod prelude {
-    pub use super::data::ShardManagerContainer;
+    pub use super::data::{ShardManagerContainer, PostgreSqlContainer};
     pub use super::error::*;
     pub use log::{debug, error, info, trace, warn};
-    pub use mongodb::{
-        bson, db::ThreadedDatabase, doc, Client as MongoClient,
-        ThreadedClient as ThreadedMongoClient,
-    };
     pub use r2d2::{Pool, PooledConnection};
-    pub use r2d2_mongodb::MongodbConnectionManager;
+    pub use diesel::{r2d2::ConnectionManager as DieselConnectionManager, pg::PgConnection};
 
-    pub type MongoPool = Pool<MongodbConnectionManager>;
+    pub type PgPool = Pool<DieselConnectionManager<PgConnection>>;
 }
 
 fn main() -> Result<()> {
@@ -73,17 +71,11 @@ fn main() -> Result<()> {
     }
     info!("The logger has been initalised.");
 
-    // Connect to MongoDB with R2D2 pooling.
-    // TODO? (Still unsure): Move to some SQL db
-    info!("Creating connection with MongoDB...");
-    let mongo = MongodbConnectionManager::new(
-        MongoConnOpts::builder()
-            .with_host(config.mongo_host(), *config.mongo_port())
-            .with_db("asami")
-            .build(),
-    );
-    let mongo = Pool::new(mongo)?;
-    info!("Mongo connection pool created!");
+    // Connect to PgSql with R2D2 pooling.
+    info!("Creating connection pool with PostgreSql...");
+    let pgsql = DieselConnectionManager::new(config.pgsql_url().to_owned());
+    let pgsql = PgPool::new(pgsql)?;
+    info!("PgSql connection pool created!");
 
     // Create the Discord client.
     let mut discord_client: Client = Client::new(&config.token(), self::serenityhandler::SerenityHandler)?;
@@ -106,7 +98,7 @@ fn main() -> Result<()> {
     {
         let mut data = discord_client.data.write();
         data.insert::<ShardManagerContainer>(Arc::clone(&discord_client.shard_manager));
-        data.insert::<MongoContainer>(mongo.clone());
+        data.insert::<PostgreSqlContainer>(pgsql.clone());
         #[rustfmt::skip]
         data.insert::<ServerSettingsContainer>(
             LruCache::with_expiry_duration(Duration::from_secs(60 * 5))

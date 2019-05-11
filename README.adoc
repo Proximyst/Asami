@@ -14,9 +14,9 @@ Please don't look at the source, it's all a big shitfest.
 . Get https://rustup.rs[Rust using Rustup].
 . Compile using `cargo build --release`, potentially for some other target
 triple than the compiling system.
-. Install https://mongodb.com[MongoDB] using your package manager or installer
-of choice. This is required to be running and properly configured *without* TLS
-and authentication.
+. Install https://www.postgresql.org/[PostgreSql] using your package manager or
+installer of choice. This is required to be running properly configured with
+the table setups found in link:src/scheme.rs[scheme.rs].
 . Run the bot once and fix the `config.toml` file with correct information.
 . Get a bot token from <https://discordapp.com/developers>.
 . Run the bot as one usually would and start using it. The owner of the bot will

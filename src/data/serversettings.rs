@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use super::MongoContainer;
 use crate::prelude::*;
 use getset::Getters;
 use lru_time_cache::LruCache;
@@ -41,31 +40,36 @@ impl ServerSettings {
             }
         }
 
-        let doc = {
-            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-            let mongo = mongo.get()?;
-            let collection: mongodb::coll::Collection =
-                mongo.collection(crate::consts::COLLECTION_SERVER_SETTINGS);
-            collection.find_one(
-                Some(doc! {
-                    "server_id": server_id,
-                }),
-                None,
-            )?
-        };
+        {
+            use crate::scheme::server_settings::dsl::*;
+            use diesel::prelude::*;
 
-        if let Some(doc) = doc {
-            let blacklisted = doc.get_bool("blacklisted")?;
-            let settings = Arc::new(RwLock::new(ServerSettings {
-                server_id,
-                blacklisted,
+            let pgpool = read.get::<PostgreSqlContainer>().failure()?;
+            let pgconn = pgpool.get()?;
 
-                modified: false,
-                serenity_data: Arc::clone(&sharemap),
-            }));
-            let cache = read.get_mut::<ServerSettingsContainer>().failure()?;
-            cache.insert(server_id, Arc::clone(&settings));
-            return Ok(settings);
+            let mut setting = server_settings
+                .filter(id.eq(server_id as i64))
+                .limit(1)
+                .load::<(i64, bool)>(&pgconn)?;
+            let setting = setting.pop();
+
+            if let Some(s) = setting {
+                let (server_id, blacklist) = s;
+                let server_id = server_id as u64;
+
+                let settings = Arc::new(RwLock::new(ServerSettings {
+                    server_id,
+                    blacklisted: blacklist,
+
+                    modified: false,
+                    serenity_data: Arc::clone(&sharemap),
+                }));
+
+                let cache = read.get_mut::<ServerSettingsContainer>().failure()?;
+                cache.insert(server_id, Arc::clone(&settings));
+
+                return Ok(settings);
+            }
         }
 
         drop(read);
@@ -79,30 +83,35 @@ impl ServerSettings {
         };
         settings.save()?;
         let arced = Arc::new(RwLock::new(settings));
+
         let mut read = sharemap.write();
         let cache = read.get_mut::<ServerSettingsContainer>().failure()?;
+
         cache.insert(server_id, Arc::clone(&arced));
 
         Ok(arced)
     }
 
     pub fn save(&mut self) -> Result<()> {
+        use crate::scheme::server_settings::dsl::*;
+        use diesel::{dsl::*, prelude::*};
+
         if !self.modified {
             return Ok(());
         }
 
         let read = self.serenity_data.read();
-        let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-        let mongo = mongo.get()?;
-        let collection: mongodb::coll::Collection =
-            mongo.collection(crate::consts::COLLECTION_SERVER_SETTINGS);
-        collection.insert_one(
-            doc! {
-                "server_id": self.server_id,
-                "blacklisted": self.blacklisted,
-            },
-            None,
-        )?;
+        let connpool = read.get::<PostgreSqlContainer>().failure()?;
+        let pgconn = connpool.get()?;
+        insert_into(server_settings)
+            .values((
+                id.eq(self.server_id as i64),
+                blacklisted.eq(self.blacklisted),
+            ))
+            .on_conflict(id)
+            .do_update()
+            .set(blacklisted.eq(self.blacklisted))
+            .execute(&pgconn)?;
 
         self.modified = false;
         Ok(())
@@ -114,21 +123,17 @@ impl ServerSettings {
     }
 
     pub fn delete(mut self) -> Result<()> {
+        use crate::scheme::server_settings::dsl::*;
+        use diesel::{dsl::*, prelude::*};
+
         self.modified = false;
 
         let mut read = self.serenity_data.write();
 
         {
-            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-            let mongo = mongo.get()?;
-            let collection: mongodb::coll::Collection =
-                mongo.collection(crate::consts::COLLECTION_SERVER_SETTINGS);
-            collection.delete_one(
-                doc! {
-                    "server_id": self.server_id,
-                },
-                None,
-            )?;
+            let connpool = read.get::<PostgreSqlContainer>().failure()?;
+            let pgconn = connpool.get()?;
+            delete(server_settings.filter(id.eq(self.server_id as i64))).execute(&pgconn)?;
         }
 
         {

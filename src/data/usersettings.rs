@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use super::MongoContainer;
 use crate::prelude::*;
 use getset::Getters;
 use lru_time_cache::LruCache;
@@ -41,31 +40,36 @@ impl UserSettings {
             }
         }
 
-        let doc = {
-            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-            let mongo = mongo.get()?;
-            let collection: mongodb::coll::Collection =
-                mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
-            collection.find_one(
-                Some(doc! {
-                    "user_id": user_id,
-                }),
-                None,
-            )?
-        };
+        {
+            use crate::scheme::user_settings::dsl::*;
+            use diesel::prelude::*;
 
-        if let Some(doc) = doc {
-            let blacklisted = doc.get_bool("blacklisted")?;
-            let settings = Arc::new(RwLock::new(UserSettings {
-                user_id,
-                blacklisted,
+            let pgpool = read.get::<PostgreSqlContainer>().failure()?;
+            let pgconn = pgpool.get()?;
 
-                modified: false,
-                serenity_data: Arc::clone(&sharemap),
-            }));
-            let cache = read.get_mut::<UserSettingsContainer>().failure()?;
-            cache.insert(user_id, Arc::clone(&settings));
-            return Ok(settings);
+            let mut setting = user_settings
+                .filter(id.eq(user_id as i64))
+                .limit(1)
+                .load::<(i64, bool)>(&pgconn)?;
+            let setting = setting.pop();
+
+            if let Some(s) = setting {
+                let (user_id, blacklist) = s;
+                let user_id = user_id as u64;
+
+                let settings = Arc::new(RwLock::new(UserSettings {
+                    user_id,
+                    blacklisted: blacklist,
+
+                    modified: false,
+                    serenity_data: Arc::clone(&sharemap),
+                }));
+
+                let cache = read.get_mut::<UserSettingsContainer>().failure()?;
+                cache.insert(user_id, Arc::clone(&settings));
+
+                return Ok(settings);
+            }
         }
 
         drop(read);
@@ -79,41 +83,13 @@ impl UserSettings {
         };
         settings.save()?;
         let arced = Arc::new(RwLock::new(settings));
+
         let mut read = sharemap.write();
         let cache = read.get_mut::<UserSettingsContainer>().failure()?;
+
         cache.insert(user_id, Arc::clone(&arced));
 
         Ok(arced)
-    }
-
-    pub fn save(&mut self) -> Result<()> {
-        if !self.modified {
-            return Ok(());
-        }
-
-        let mut read = self.serenity_data.write();
-
-        {
-            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-            let mongo = mongo.get()?;
-            let collection: mongodb::coll::Collection =
-                mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
-            collection.insert_one(
-                doc! {
-                    "user_id": self.user_id,
-                    "blacklisted": self.blacklisted,
-                },
-                None,
-            )?;
-        }
-
-        {
-            let cache = read.get_mut::<UserSettingsContainer>().failure()?;
-            cache.remove(&self.user_id);
-        }
-
-        self.modified = false;
-        Ok(())
     }
 
     pub fn set_blacklisted(&mut self, new: bool) {
@@ -121,20 +97,45 @@ impl UserSettings {
         self.blacklisted = new;
     }
 
-    pub fn delete(mut self) -> Result<()> {
-        self.modified = false;
+    pub fn save(&mut self) -> Result<()> {
+        use crate::scheme::user_settings::dsl::*;
+        use diesel::{dsl::*, prelude::*};
+        if !self.modified {
+            return Ok(());
+        }
 
         let read = self.serenity_data.read();
-        let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-        let mongo = mongo.get()?;
-        let collection: mongodb::coll::Collection =
-            mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
-        collection.delete_one(
-            doc! {
-                "user_id": self.user_id,
-            },
-            None,
-        )?;
+        let connpool = read.get::<PostgreSqlContainer>().failure()?;
+        let pgconn = connpool.get()?;
+        insert_into(user_settings)
+            .values((id.eq(self.user_id as i64), blacklisted.eq(self.blacklisted)))
+            .on_conflict(id)
+            .do_update()
+            .set(blacklisted.eq(self.blacklisted))
+            .execute(&pgconn)?;
+
+        self.modified = false;
+        Ok(())
+    }
+
+    pub fn delete(mut self) -> Result<()> {
+        use crate::scheme::user_settings::dsl::*;
+        use diesel::{dsl::*, prelude::*};
+
+        self.modified = false;
+
+        let mut read = self.serenity_data.write();
+
+        {
+            let connpool = read.get::<PostgreSqlContainer>().failure()?;
+            let pgconn = connpool.get()?;
+            delete(user_settings.filter(id.eq(self.user_id as i64))).execute(&pgconn)?;
+        }
+
+        {
+            let cache = read.get_mut::<UserSettingsContainer>().failure()?;
+            cache.remove(&self.user_id);
+        }
 
         Ok(())
     }
