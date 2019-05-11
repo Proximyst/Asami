@@ -3,6 +3,7 @@ use serenity::{
     model::{channel::Message, gateway::Ready, guild::Member, id::GuildId, user::User},
     prelude::*,
 };
+use std::sync::Arc;
 
 pub struct SerenityHandler;
 
@@ -39,7 +40,24 @@ impl EventHandler for SerenityHandler {
                 return;
             }
         };
-        cache.remove(&guild.0);
+        if let Some(s) = cache.get(&guild.0) {
+            if *s.read().blacklisted() {
+                return;
+            }
+        }
+        if let Some(s) = cache.remove(&guild.0) {
+            let s = match Arc::try_unwrap(s) {
+                Ok(s) => s,
+                Err(_) => {
+                    error!("Couldn't unwrap server {}'s arc", guild.0);
+                    return;
+                },
+            };
+            match s.into_inner().delete().err() {
+                None => {},
+                Some(e) => error!("Couldn't delete {}: {}", guild.0, e),
+            }
+        }
         info!("Left guild {}", guild.0);
     }
 

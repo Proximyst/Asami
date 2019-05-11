@@ -116,17 +116,25 @@ impl ServerSettings {
     pub fn delete(mut self) -> Result<()> {
         self.modified = false;
 
-        let read = self.serenity_data.read();
-        let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-        let mongo = mongo.get()?;
-        let collection: mongodb::coll::Collection =
-            mongo.collection(crate::consts::COLLECTION_SERVER_SETTINGS);
-        collection.delete_one(
-            doc! {
-                "server_id": self.server_id,
-            },
-            None,
-        )?;
+        let mut read = self.serenity_data.write();
+
+        {
+            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
+            let mongo = mongo.get()?;
+            let collection: mongodb::coll::Collection =
+                mongo.collection(crate::consts::COLLECTION_SERVER_SETTINGS);
+            collection.delete_one(
+                doc! {
+                    "server_id": self.server_id,
+                },
+                None,
+            )?;
+        }
+
+        {
+            let cache = read.get_mut::<ServerSettingsContainer>().failure()?;
+            cache.remove(&self.server_id);
+        }
 
         Ok(())
     }
