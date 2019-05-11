@@ -39,6 +39,8 @@ pub mod prelude {
 }
 
 fn main() -> Result<()> {
+    // Loads configuration from "config.toml" in PWD.
+    // TODO? (Unsure still): Read directory from env
     let config: Configuration = {
         use std::{fs, io::prelude::*};
         match fs::File::open("config.toml") {
@@ -55,6 +57,7 @@ fn main() -> Result<()> {
         }
     };
 
+    // Initialise and use the SimpleLog logger along with the log crate's macros.
     println!("Making logger...");
     {
         use simplelog::{CombinedLogger, Config as LogConfig, LevelFilter, TermLogger};
@@ -70,6 +73,8 @@ fn main() -> Result<()> {
     }
     info!("The logger has been initalised.");
 
+    // Connect to MongoDB with R2D2 pooling.
+    // TODO? (Still unsure): Move to some SQL db
     info!("Creating connection with MongoDB...");
     let mongo = MongodbConnectionManager::new(
         MongoConnOpts::builder()
@@ -80,8 +85,10 @@ fn main() -> Result<()> {
     let mongo = Pool::new(mongo)?;
     info!("Mongo connection pool created!");
 
+    // Create the Discord client.
     let mut discord_client: Client = Client::new(&config.token(), self::serenityhandler::SerenityHandler)?;
 
+    // Load the owners from the application on Discord's developers page
     let owners = {
         let mut set = HashSet::new();
         set.insert(
