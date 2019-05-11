@@ -102,6 +102,7 @@ fn main() -> Result<()> {
         set
     };
 
+    // Write data to the sharemap
     {
         let mut data = discord_client.data.write();
         data.insert::<ShardManagerContainer>(Arc::clone(&discord_client.shard_manager));
@@ -117,15 +118,16 @@ fn main() -> Result<()> {
         data.insert::<OwnerContainer>(owners.clone());
     }
 
+    // Configure the bot
     discord_client.with_framework(
         StandardFramework::new()
             .configure(|c| {
-                c.with_whitespace(true)
-                    .case_insensitivity(true)
-                    .no_dm_prefix(true)
-                    .owners(owners)
-                    .prefix("a!")
-                    .delimiters(vec![" "])
+                c.with_whitespace(true) // allow `a! command`
+                    .case_insensitivity(true) // allow `a!cOmMaNd`
+                    .no_dm_prefix(true) // allow `command` in dm
+                    .owners(owners) // set owners of the bot
+                    .prefix("a!") // set the prefix to `a!`
+                    .delimiters(vec![" "]) // split arguments at space; `a!test a b c` => `[a!test, a, b, c]`
             })
             .before(|ctx, msg, _| {
                 {
@@ -185,6 +187,7 @@ fn main() -> Result<()> {
             .group(&DEVELOPER_GROUP)
     );
 
+    // Start and shard the bot as needed to work with discord
     discord_client.start_autosharded()?;
 
     Ok(())
