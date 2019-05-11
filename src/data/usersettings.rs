@@ -91,23 +91,31 @@ impl UserSettings {
             return Ok(());
         }
 
-        let read = self.serenity_data.read();
-        let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
-        let mongo = mongo.get()?;
-        let collection: mongodb::coll::Collection =
-            mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
-        collection.insert_one(
-            doc! {
-                "user_id": self.user_id,
-                "blacklisted": self.blacklisted,
-            },
-            None,
-        )?;
+        let mut read = self.serenity_data.write();
+
+        {
+            let mongo: &MongoPool = read.get::<MongoContainer>().failure()?;
+            let mongo = mongo.get()?;
+            let collection: mongodb::coll::Collection =
+                mongo.collection(crate::consts::COLLECTION_USER_SETTINGS);
+            collection.insert_one(
+                doc! {
+                    "user_id": self.user_id,
+                    "blacklisted": self.blacklisted,
+                },
+                None,
+            )?;
+        }
+
+        {
+            let cache = read.get_mut::<UserSettingsContainer>().failure()?;
+            cache.remove(&self.user_id);
+        }
 
         self.modified = false;
         Ok(())
     }
-    
+
     pub fn set_blacklisted(&mut self, new: bool) {
         self.modified = true;
         self.blacklisted = new;
